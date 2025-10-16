@@ -8,4 +8,6 @@ By default, the 'generate' endpoint user account character quota is enforced for
     
 The 'voice-cloning' endpoint is not currently implemented because of its beta status and complexity.
 
+Public voice name + voice ID associations are in enums.VoiceIDEnum
+
 https://docs.tts.monster/introduction
