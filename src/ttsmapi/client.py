@@ -19,27 +19,27 @@ from .ratelimiter import RateLimit, Store
 class Client:
     """TTS.Monster API client.
 
-    This class provides methods to interact with the TTS.Monster API, including 'generate'ing 
+    This class provides methods to interact with the TTS.Monster API, including 'generate'ing
     text-to-speech audio, retrieving 'user' information, and listing available 'voices'.
 
     An attempt is made to avoid exceeding endpoint rate limits by tracking and rate limiting usage locally.
 
-    By default, the 'generate' endpoint user account character quota is enforced for convenience. Requests 
-    that would exceed the character quota will raise a TTSMAPIError. If enforcement is disabled, you 
+    By default, the 'generate' endpoint user account character quota is enforced for convenience. Requests
+    that would exceed the character quota will raise a TTSMAPIError. If enforcement is disabled, you
     will be subject to requests being rejected by TTS.Monster (free plan) or overage fees (paid plans).
 
     The 'voice-cloning' endpoint is not currently implemented because of its beta status and complexity.
     """
 
     _name: str = "Python TTSM-API"
-    #TODO: move rate limiting to a real library like token-throttle later
+    # TODO: move rate limiting to a real library like token-throttle later
     _rate_limit_store: Store = Store()
     user_rate_limit: RateLimit = RateLimit(count=50, period=timedelta(seconds=60))
     voices_rate_limit: RateLimit = RateLimit(count=50, period=timedelta(seconds=60))
     generate_rate_limit: RateLimit = RateLimit(count=30, period=timedelta(seconds=60))
     generate_character_limit: int = 500
 
-    def __init__(self, api_key: str, enforce_char_quota: bool = True):
+    def __init__(self, api_key: str, *, enforce_char_quota: bool = True) -> None:
         """Initialize a TTS.Monster API Client object.
 
         Args:
@@ -60,13 +60,13 @@ class Client:
 
         self.enforce_char_quota: bool = enforce_char_quota
 
-        # "current_plan": "free",
-        # "status": "active",
-        # "renewal_time": 1727392003,
-        # "character_usage": 145892,
-        # "character_allowance": 500000,
-        # "portal_url": "https://billing.stripe.com/p/session/live_12345",
-        # "has_payment_method": true,
+        # "current_plan": "free",  # noqa: ERA001
+        # "status": "active",  # noqa: ERA001
+        # "renewal_time": 1727392003,  # noqa: ERA001
+        # "character_usage": 145892,  # noqa: ERA001
+        # "character_allowance": 500000,  # noqa: ERA001
+        # "portal_url": "https://billing.stripe.com/p/session/live_12345",  # noqa: ERA001
+        # "has_payment_method": true,  # noqa: ERA001
         # "downgrading_to_plan": null
         self.user_info: dict
 
@@ -75,15 +75,19 @@ class Client:
                 self.user_info = self.get_user()
             except HTTPError as e:
                 if e.response.status_code == HTTPStatus.UNAUTHORIZED:
-                    raise TTSMAPIError("Invalid API key") from e
-                raise TTSMAPIError("Failed to get user info from TTS.Monster API") from e
+                    msg = "Invalid API key"
+                    raise TTSMAPIError(msg) from e
+                msg = "Failed to get user info from TTS.Monster API"
+                raise TTSMAPIError(msg) from e
 
-            if 'character_allowance' not in self.user_info:
-                raise TTSMAPIError("User info does not contain 'character_allowance'")
-            if 'character_usage' not in self.user_info:
-                raise TTSMAPIError("User info does not contain 'character_usage'")
+            if "character_allowance" not in self.user_info:
+                msg = "User info does not contain 'character_allowance'"
+                raise TTSMAPIError(msg)
+            if "character_usage" not in self.user_info:
+                msg = "User info does not contain 'character_usage'"
+                raise TTSMAPIError(msg)
 
-    def post(self, endpoint: str, rate_limit: RateLimit, ep_json: dict|None = None) -> dict:
+    def post(self, endpoint: str, rate_limit: RateLimit, ep_json: dict | None = None) -> dict:
         """Set up and perform a Requests POST for a given TTS.Monster endpoint.
 
         Args:
@@ -100,7 +104,7 @@ class Client:
 
         """
         full_url: str = self._url + endpoint
-        headers: dict = {'User-Agent': self._user_agent, 'Authorization': self._api_key}
+        headers: dict = {"User-Agent": self._user_agent, "Authorization": self._api_key}
 
         rate_limited: bool = self._rate_limit_store.update(full_url, rate_limit)
         if rate_limited:
@@ -120,11 +124,12 @@ class Client:
         try:
             response_json: dict = response.json()
         except (ValueError, JSONDecodeError) as e:
-            raise TTSMAPIError("Invalid/no JSON in response") from e
+            msg = "Invalid/no JSON in response"
+            raise TTSMAPIError(msg) from e
 
         return response_json
 
-    def generate(self, voice_id: str, message: str, return_usage: bool = True) -> dict:
+    def generate(self, voice_id: str, message: str, *, return_usage: bool = True) -> dict:
         """TTS.Monster 'generate' endpoint (POST).
 
         https://docs.tts.monster/endpoint/generate
@@ -142,20 +147,25 @@ class Client:
             HTTPError: If the API returns an unrecoverable non-2XX HTTP status code.
 
         """
-        ep_json: dict = {'voice_id': voice_id,
-                        'message': message,
-                        'return_usage': return_usage}
+        ep_json: dict = {"voice_id": voice_id, "message": message, "return_usage": return_usage}
 
         if len(message) > self.generate_character_limit:
-            raise TTSMAPIError(f"Message exceeds character limit of {self.generate_character_limit} characters.")
-        if self.enforce_char_quota and self.user_info['character_usage'] + len(message) > self.user_info['character_allowance']:
-            raise TTSMAPIError(f"Message of len {len(message)} would exceed TTSM character usage quota of "
-                                f"{self.user_info['character_usage']}/"
-                                f"{self.user_info['character_allowance']} characters.")
+            msg = f"Message exceeds character limit of {self.generate_character_limit} characters."
+            raise TTSMAPIError(msg)
+        if (
+            self.enforce_char_quota
+            and self.user_info["character_usage"] + len(message) > self.user_info["character_allowance"]
+        ):
+            msg = (
+                f"Message of len {len(message)} would exceed TTSM character usage quota of "
+                f"{self.user_info['character_usage']}/"
+                f"{self.user_info['character_allowance']} characters."
+            )
+            raise TTSMAPIError(msg)
 
         response_json: dict = self.post(endpoint="generate", ep_json=ep_json, rate_limit=self.generate_rate_limit)
 
-        self.user_info['character_usage'] = response_json['characterUsage']
+        self.user_info["character_usage"] = response_json["characterUsage"]
 
         return response_json
 
