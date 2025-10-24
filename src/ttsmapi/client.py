@@ -60,6 +60,7 @@ class Client:
 
         self.enforce_char_quota: bool = enforce_char_quota
 
+        # Example 'user' endpoint response:
         # "current_plan": "free",  # noqa: ERA001
         # "status": "active",  # noqa: ERA001
         # "renewal_time": 1727392003,  # noqa: ERA001
@@ -70,22 +71,21 @@ class Client:
         # "downgrading_to_plan": null
         self.user_info: dict
 
-        if self.enforce_char_quota:
-            try:
-                self.user_info = self.get_user()
-            except HTTPError as e:
-                if e.response.status_code == HTTPStatus.UNAUTHORIZED:
-                    msg = "Invalid API key"
-                    raise TTSMAPIError(msg) from e
-                msg = "Failed to get user info from TTS.Monster API"
+        try:
+            self.user_info = self.get_user()
+        except HTTPError as e:
+            if e.response.status_code == HTTPStatus.UNAUTHORIZED:
+                msg = "Invalid API key"
                 raise TTSMAPIError(msg) from e
+            msg = "Failed to get user info from TTS.Monster API"
+            raise TTSMAPIError(msg) from e
 
-            if "character_allowance" not in self.user_info:
-                msg = "User info does not contain 'character_allowance'"
-                raise TTSMAPIError(msg)
-            if "character_usage" not in self.user_info:
-                msg = "User info does not contain 'character_usage'"
-                raise TTSMAPIError(msg)
+        if "character_allowance" not in self.user_info:
+            msg = "User info does not contain 'character_allowance'"
+            raise TTSMAPIError(msg)
+        if "character_usage" not in self.user_info:
+            msg = "User info does not contain 'character_usage'"
+            raise TTSMAPIError(msg)
 
     def post(self, endpoint: str, rate_limit: RateLimit, ep_json: dict | None = None) -> dict:
         """Set up and perform a Requests POST for a given TTS.Monster endpoint.
